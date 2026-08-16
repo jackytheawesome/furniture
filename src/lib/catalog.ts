@@ -238,3 +238,68 @@ export function facadeKey(type: FacadeType | string): string {
       return "facade-film";
   }
 }
+
+const INTERNAL_PARAM_KEYS = new Set([
+  "boardMaterialKey",
+  "hdfMaterialKey",
+  "facadeMaterialKey",
+]);
+
+/** Human-readable params for estimate / cart summaries. */
+export function formatCartItemParams(
+  itemType: string,
+  paramsRaw: string | Record<string, unknown>,
+): { label: string; entries: { key: string; label: string; value: string }[] } {
+  const def = getCatalogByType(itemType);
+  let params: Record<string, unknown> = {};
+  if (typeof paramsRaw === "string") {
+    try {
+      params = JSON.parse(paramsRaw || "{}") as Record<string, unknown>;
+    } catch {
+      params = {};
+    }
+  } else {
+    params = paramsRaw ?? {};
+  }
+
+  const entries: { key: string; label: string; value: string }[] = [];
+  const fields = def?.fields ?? [];
+
+  for (const field of fields) {
+    if (!(field.key in params)) continue;
+    const raw = params[field.key];
+    if (raw === "" || raw === null || raw === undefined) continue;
+    let value: string;
+    if (field.type === "boolean") {
+      if (!raw) continue;
+      value = "да";
+    } else if (field.type === "select") {
+      const opt = field.options?.find((o) => o.value === String(raw));
+      value = opt?.label ?? String(raw);
+    } else {
+      value = String(raw);
+    }
+    entries.push({ key: field.key, label: field.label, value });
+  }
+
+  // Extra keys not in catalog (except internal material keys shown via board lines)
+  for (const [key, raw] of Object.entries(params)) {
+    if (INTERNAL_PARAM_KEYS.has(key)) continue;
+    if (fields.some((f) => f.key === key)) continue;
+    if (raw === "" || raw === null || raw === undefined || raw === false) continue;
+    entries.push({ key, label: key, value: String(raw) });
+  }
+
+  return {
+    label: def?.label ?? itemType,
+    entries,
+  };
+}
+
+export function formatCartItemParamsSummary(
+  itemType: string,
+  paramsRaw: string | Record<string, unknown>,
+): string {
+  const { entries } = formatCartItemParams(itemType, paramsRaw);
+  return entries.map((e) => `${e.label}: ${e.value}`).join(" · ");
+}

@@ -176,13 +176,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     await load();
   }
 
-  async function applyBoardMaterial(
+  async function applyMaterialFromPrice(
     cartItemId: string | null,
     line: Line,
     option: PricePickOption,
+    paramKey: "boardMaterialKey" | "hdfMaterialKey" | "facadeMaterialKey",
   ) {
-    const kind = /хдф|hdf/i.test(line.name) ? "hdf" : "board";
-
     if (!cartItemId || !project) {
       const nextName =
         line.cartItemId == null
@@ -194,7 +193,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         name: nextName,
         unitPrice: option.price,
         unit: option.unit,
-        category: "board",
+        category: option.category || line.category,
       });
       return;
     }
@@ -207,10 +206,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     } catch {
       current = {};
     }
-    const params =
-      kind === "hdf"
-        ? { ...current, hdfMaterialKey: option.key }
-        : { ...current, boardMaterialKey: option.key };
+    const params = { ...current, [paramKey]: option.key };
 
     const res = await fetch(`/api/projects/${projectId}/items/${cartItemId}`, {
       method: "PATCH",
@@ -238,6 +234,73 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       ),
     [prices],
   );
+
+  const facadePriceOptions = useMemo(
+    () =>
+      prices.filter(
+        (p) =>
+          p.category === "facade" ||
+          p.key.startsWith("facade-") ||
+          p.key === "glass-corrugated",
+      ),
+    [prices],
+  );
+
+  async function patchCartItemParams(
+    itemId: string,
+    patch: Record<string, string | number | boolean>,
+  ) {
+    if (!project) return;
+    const item = project.cartItems.find((c) => c.id === itemId);
+    if (!item) return;
+
+    let current: Record<string, unknown> = {};
+    try {
+      current = JSON.parse(item.params || "{}") as Record<string, unknown>;
+    } catch {
+      current = {};
+    }
+    const params = { ...current, ...patch };
+    const body: {
+      params: Record<string, unknown>;
+      name?: string;
+    } = { params };
+
+    if (
+      item.itemType === "custom" &&
+      typeof params.title === "string" &&
+      params.title.trim()
+    ) {
+      body.name = params.title.trim();
+    }
+
+    // Optimistic local params so inputs don't snap back while saving
+    setProject({
+      ...project,
+      cartItems: project.cartItems.map((c) =>
+        c.id === itemId
+          ? {
+              ...c,
+              params: JSON.stringify(params),
+              name: body.name ?? c.name,
+            }
+          : c,
+      ),
+    });
+
+    const res = await fetch(`/api/projects/${projectId}/items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      setMessage("Не удалось обновить параметры предмета");
+      await load();
+      return;
+    }
+    setMessage("Параметры обновлены, смета пересчитана");
+    await load();
+  }
 
   async function patchLine(lineId: string, patch: Partial<Line>) {
     await fetch(`/api/projects/${projectId}/lines`, {
@@ -380,6 +443,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       id: string | null;
       title: string;
       subtitle?: string;
+      itemType?: string;
+      paramValues?: Record<string, string | number | boolean>;
       lines: Line[];
       subtotal: number;
     }> = [];
@@ -389,10 +454,26 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       const subtotal = lines
         .filter((l) => l.enabled)
         .reduce((a, l) => a + l.quantity * l.unitPrice, 0);
+      const def = getCatalogByType(item.itemType);
+      let paramValues: Record<string, string | number | boolean> = {};
+      try {
+        paramValues = JSON.parse(item.params || "{}") as Record<
+          string,
+          string | number | boolean
+        >;
+      } catch {
+        paramValues = {};
+      }
+      // Ensure catalog defaults exist for missing keys so fields show
+      if (def) {
+        paramValues = { ...defaultParams(def.type), ...paramValues };
+      }
       groups.push({
         id: item.id,
         title: item.name,
-        subtitle: item.itemType,
+        subtitle: def?.label ?? item.itemType,
+        itemType: item.itemType,
+        paramValues,
         lines,
         subtotal,
       });
@@ -798,15 +879,158 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                   <tr className="border-t border-stone-300 bg-[#ebe4d8]">
                     <td colSpan={7} className="px-3 py-2.5">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <div>
-                          <span className="font-[family-name:var(--font-display)] text-base text-stone-900">
-                            {group.title}
-                          </span>
-                          {group.subtitle && (
-                            <span className="ml-2 text-xs text-stone-500">
-                              {group.subtitle}
+                        <div className="min-w-0 flex-1">
+                          <div>
+                            <span className="font-[family-name:var(--font-display)] text-base text-stone-900">
+                              {group.title}
                             </span>
-                          )}
+                            {group.subtitle && (
+                              <span className="ml-2 text-xs text-stone-500">
+                                {group.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          {group.id && group.itemType && group.paramValues ? (
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                              {(getCatalogByType(group.itemType)?.fields ?? []).map(
+                                (field) => {
+                                  const values = group.paramValues!;
+                                  const itemId = group.id!;
+                                  return (
+                                    <label
+                                      key={field.key}
+                                      className="text-xs text-stone-600"
+                                    >
+                                      {field.label}
+                                      {field.type === "boolean" ? (
+                                        <span className="mt-1 flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={Boolean(values[field.key])}
+                                            onChange={(e) =>
+                                              void patchCartItemParams(itemId, {
+                                                [field.key]: e.target.checked,
+                                              })
+                                            }
+                                          />
+                                          <span className="text-stone-800">
+                                            {values[field.key] ? "да" : "нет"}
+                                          </span>
+                                        </span>
+                                      ) : field.type === "select" ? (
+                                        <select
+                                          className="mt-1 w-full rounded border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                                          value={String(values[field.key] ?? "")}
+                                          onChange={(e) =>
+                                            void patchCartItemParams(itemId, {
+                                              [field.key]: e.target.value,
+                                            })
+                                          }
+                                        >
+                                          {field.options?.map((o) => (
+                                            <option key={o.value} value={o.value}>
+                                              {o.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : field.type === "number" ? (
+                                        <NumberField
+                                          className="mt-1 w-full rounded border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                                          value={Number(values[field.key] ?? 0)}
+                                          live
+                                          onChange={(n) => {
+                                            if (!project) return;
+                                            let current: Record<
+                                              string,
+                                              string | number | boolean
+                                            > = {};
+                                            try {
+                                              current = JSON.parse(
+                                                project.cartItems.find(
+                                                  (c) => c.id === itemId,
+                                                )?.params || "{}",
+                                              ) as Record<
+                                                string,
+                                                string | number | boolean
+                                              >;
+                                            } catch {
+                                              current = {};
+                                            }
+                                            setProject({
+                                              ...project,
+                                              cartItems: project.cartItems.map(
+                                                (c) =>
+                                                  c.id === itemId
+                                                    ? {
+                                                        ...c,
+                                                        params: JSON.stringify({
+                                                          ...current,
+                                                          [field.key]: n,
+                                                        }),
+                                                      }
+                                                    : c,
+                                              ),
+                                            });
+                                          }}
+                                          onCommit={(n) =>
+                                            void patchCartItemParams(itemId, {
+                                              [field.key]: n,
+                                            })
+                                          }
+                                        />
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          className="mt-1 w-full rounded border border-stone-300 bg-white px-2 py-1.5 text-sm text-stone-900"
+                                          value={String(values[field.key] ?? "")}
+                                          onChange={(e) => {
+                                            if (!project) return;
+                                            let current: Record<
+                                              string,
+                                              string | number | boolean
+                                            > = {};
+                                            try {
+                                              current = JSON.parse(
+                                                project.cartItems.find(
+                                                  (c) => c.id === itemId,
+                                                )?.params || "{}",
+                                              ) as Record<
+                                                string,
+                                                string | number | boolean
+                                              >;
+                                            } catch {
+                                              current = {};
+                                            }
+                                            setProject({
+                                              ...project,
+                                              cartItems: project.cartItems.map(
+                                                (c) =>
+                                                  c.id === itemId
+                                                    ? {
+                                                        ...c,
+                                                        params: JSON.stringify({
+                                                          ...current,
+                                                          [field.key]:
+                                                            e.target.value,
+                                                        }),
+                                                      }
+                                                    : c,
+                                              ),
+                                            });
+                                          }}
+                                          onBlur={(e) =>
+                                            void patchCartItemParams(itemId, {
+                                              [field.key]: e.target.value,
+                                            })
+                                          }
+                                        />
+                                      )}
+                                    </label>
+                                  );
+                                },
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex items-center gap-3">
                           <button
@@ -875,18 +1099,40 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                         </td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1">
-                            {line.category === "board" ? (
+                            {line.category === "board" ||
+                            line.category === "facade" ? (
                               <PriceCombobox
-                                options={boardPriceOptions}
+                                options={
+                                  line.category === "facade"
+                                    ? facadePriceOptions
+                                    : boardPriceOptions
+                                }
                                 label={displayName}
-                                placeholder="Плита из прайса…"
-                                onSelect={(opt) =>
-                                  void applyBoardMaterial(
+                                placeholder={
+                                  line.category === "facade"
+                                    ? "Фасад из прайса…"
+                                    : "Плита из прайса…"
+                                }
+                                onSelect={(opt) => {
+                                  if (line.category === "facade") {
+                                    void applyMaterialFromPrice(
+                                      group.id,
+                                      line,
+                                      opt,
+                                      "facadeMaterialKey",
+                                    );
+                                    return;
+                                  }
+                                  const kind = /хдф|hdf/i.test(line.name)
+                                    ? "hdfMaterialKey"
+                                    : "boardMaterialKey";
+                                  void applyMaterialFromPrice(
                                     group.id,
                                     line,
                                     opt,
-                                  )
-                                }
+                                    kind,
+                                  );
+                                }}
                                 onLabelChange={(value) => {
                                   const nextName =
                                     group.id != null

@@ -43,6 +43,19 @@ function resolveBoardKey(
   return prices[fallback] ? fallback : preferred;
 }
 
+function resolveFacadePriceKey(
+  prices: PriceMap,
+  params: Record<string, unknown>,
+  facadeType: string,
+): string {
+  const preferred = params.facadeMaterialKey
+    ? String(params.facadeMaterialKey)
+    : facadeKey(facadeType);
+  const fallback = facadeKey(facadeType);
+  if (prices[preferred]) return preferred;
+  return prices[fallback] ? fallback : preferred;
+}
+
 function pushPrice(
   lines: DraftLine[],
   prices: PriceMap,
@@ -125,6 +138,7 @@ export function buildLinesForItem(
   // Generic cabinet-like body
   const boardKey = resolveBoardKey(prices, params, "board");
   const hdfKey = resolveBoardKey(prices, params, "hdf");
+  const facadePriceKey = resolveFacadePriceKey(prices, params, facadeType);
   const boardM2 = (2 * (w * h + w * d + h * d) + shelves * w * d) * 1.12;
   const hdfM2 = w * h * 0.9;
   const facadeM2 = Math.max(doors, 1) > 0 || drawers > 0
@@ -149,7 +163,13 @@ export function buildLinesForItem(
     prefix + (prices[hdfKey]?.name ?? "ХДФ"),
   );
   if (facadeArea > 0) {
-    pushPrice(lines, prices, facadeKey(facadeType), facadeArea, prefix + "Фасады");
+    pushPrice(
+      lines,
+      prices,
+      facadePriceKey,
+      facadeArea,
+      prefix + (prices[facadePriceKey]?.name ?? "Фасады"),
+    );
   }
   if (antresol) {
     pushPrice(
@@ -161,7 +181,15 @@ export function buildLinesForItem(
         "Антресоль · " +
         (prices[boardKey]?.name ?? "плита"),
     );
-    pushPrice(lines, prices, facadeKey(facadeType), w * 0.4, prefix + "Антресоль (фасад)");
+    pushPrice(
+      lines,
+      prices,
+      facadePriceKey,
+      w * 0.4,
+      prefix +
+        "Антресоль · " +
+        (prices[facadePriceKey]?.name ?? "фасад"),
+    );
   }
 
   const edgeThin = boardM2 * 3;
