@@ -13,9 +13,22 @@ import {
   CONFIDENCE_LABELS,
   UNIT_LABELS,
   type Confidence,
+  type PriceCategory,
+  type PriceUnit,
 } from "@/lib/types";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+
+interface PriceOption {
+  id: string;
+  key: string;
+  category: string;
+  name: string;
+  unit: string;
+  price: number;
+  helpKey?: string | null;
+  note?: string;
+}
 
 interface CartItem {
   id: string;
@@ -78,6 +91,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [prices, setPrices] = useState<PriceOption[]>([]);
+  const [addLineFor, setAddLineFor] = useState<string | "common" | null>(null);
 
   const typesInCategory = useMemo(
     () => CATALOG.filter((c) => c.category === category),
@@ -102,6 +117,15 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/prices");
+      if (!res.ok) return;
+      const data = await res.json();
+      setPrices(data.prices ?? []);
+    })();
+  }, []);
 
   useEffect(() => {
     const first = CATALOG.find((c) => c.category === category);
@@ -156,12 +180,42 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     await load();
   }
 
-  async function addManualLine() {
+  async function addEstimateLine(input: {
+    cartItemId?: string | null;
+    name: string;
+    category?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+    helpKey?: string;
+    note?: string;
+  }) {
+    const item =
+      input.cartItemId != null
+        ? project?.cartItems.find((c) => c.id === input.cartItemId)
+        : null;
+    const rawName = input.name.trim() || "Ручная статья";
+    const name =
+      item && !rawName.startsWith(`${item.name}:`)
+        ? `${item.name}: ${rawName}`
+        : rawName;
+
     await fetch(`/api/projects/${projectId}/lines`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "Ручная статья", unitPrice: 0 }),
+      body: JSON.stringify({
+        cartItemId: input.cartItemId ?? null,
+        name,
+        category: input.category ?? "other",
+        quantity: input.quantity ?? 1,
+        unit: input.unit ?? "pcs",
+        unitPrice: input.unitPrice ?? 0,
+        helpKey: input.helpKey,
+        note: input.note ?? "",
+      }),
     });
+    setAddLineFor(null);
+    setMessage("Статья добавлена в смету");
     await load();
   }
 
@@ -264,7 +318,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
     for (const item of project.cartItems) {
       const lines = buckets.get(item.id) ?? [];
-      if (!lines.length) continue;
       const subtotal = lines
         .filter((l) => l.enabled)
         .reduce((a, l) => a + l.quantity * l.unitPrice, 0);
@@ -292,18 +345,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
 
     const common = buckets.get(null) ?? [];
-    if (common.length) {
-      const subtotal = common
-        .filter((l) => l.enabled)
-        .reduce((a, l) => a + l.quantity * l.unitPrice, 0);
-      groups.push({
-        id: null,
-        title: "Общие статьи проекта",
-        subtitle: "доставка, монтаж, ручные позиции",
-        lines: common,
-        subtotal,
-      });
-    }
+    const commonSubtotal = common
+      .filter((l) => l.enabled)
+      .reduce((a, l) => a + l.quantity * l.unitPrice, 0);
+    groups.push({
+      id: null,
+      title: "Общие статьи проекта",
+      subtitle: "доставка, монтаж, ручные позиции",
+      lines: common,
+      subtotal: commonSubtotal,
+    });
     return groups;
   }, [project]);
 
@@ -648,9 +699,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           <button
             type="button"
             className="rounded-md border px-3 py-1.5 text-sm"
-            onClick={() => void addManualLine()}
+            onClick={() =>
+              setAddLineFor((cur) => (cur === "common" ? null : "common"))
+            }
           >
-            + Ручная статья
+            + Статья к проекту
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -667,7 +720,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
               </tr>
             </thead>
             <tbody>
-              {lineGroups.map((group) => (
+              {lineGroups.map((group) => {
+                const panelKey = group.id ?? "common";
+                const panelOpen = addLineFor === panelKey;
+                return (
                 <Fragment key={group.id ?? "common"}>
                   <tr className="border-t border-stone-300 bg-[#ebe4d8]">
                     <td colSpan={7} className="px-3 py-2.5">
@@ -682,12 +738,41 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                             </span>
                           )}
                         </div>
-                        <span className="text-sm font-medium text-stone-800">
-                          Подытог: {formatRub(group.subtotal)}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            className="text-sm text-teal-900 underline-offset-2 hover:underline"
+                            onClick={() =>
+                              setAddLineFor((cur) =>
+                                cur === panelKey ? null : panelKey,
+                              )
+                            }
+                          >
+                            {panelOpen ? "Скрыть" : "+ Статья"}
+                          </button>
+                          <span className="text-sm font-medium text-stone-800">
+                            Подытог: {formatRub(group.subtotal)}
+                          </span>
+                        </div>
                       </div>
                     </td>
                   </tr>
+                  {panelOpen ? (
+                    <tr className="border-t border-stone-200 bg-[#f7f3ec]">
+                      <td colSpan={7} className="px-3 py-3">
+                        <AddEstimateLinePanel
+                          prices={prices}
+                          onCancel={() => setAddLineFor(null)}
+                          onAdd={(payload) =>
+                            void addEstimateLine({
+                              ...payload,
+                              cartItemId: group.id,
+                            })
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
                   {group.lines.map((line) => {
                     const displayName = group.title
                       ? line.name.replace(
@@ -797,6 +882,16 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                       </tr>
                     );
                   })}
+                  {!group.lines.length && !panelOpen ? (
+                    <tr className="border-t border-stone-100">
+                      <td
+                        colSpan={7}
+                        className="px-3 py-3 text-sm text-stone-500"
+                      >
+                        Пока нет статей — добавьте из прайса или произвольную.
+                      </td>
+                    </tr>
+                  ) : null}
                   <tr className="border-t border-stone-200 bg-stone-50">
                     <td
                       colSpan={5}
@@ -810,7 +905,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                     <td />
                   </tr>
                 </Fragment>
-              ))}
+              );
+              })}
               {!lineGroups.length && (
                 <tr>
                   <td
@@ -908,6 +1004,268 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
           </button>
         </section>
       )}
+    </div>
+  );
+}
+
+function AddEstimateLinePanel({
+  prices,
+  onAdd,
+  onCancel,
+}: {
+  prices: PriceOption[];
+  onAdd: (payload: {
+    name: string;
+    category?: string;
+    quantity?: number;
+    unit?: string;
+    unitPrice?: number;
+    helpKey?: string;
+    note?: string;
+  }) => void;
+  onCancel: () => void;
+}) {
+  const [mode, setMode] = useState<"price" | "custom">("price");
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<PriceCategory>("other");
+  const [unit, setUnit] = useState<PriceUnit>("pcs");
+  const [quantity, setQuantity] = useState(1);
+  const [unitPrice, setUnitPrice] = useState(0);
+  const [helpKey, setHelpKey] = useState<string | undefined>();
+  const [note, setNote] = useState("");
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return prices.slice(0, 12);
+    return prices
+      .filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.key.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          (p.note ?? "").toLowerCase().includes(q),
+      )
+      .slice(0, 20);
+  }, [prices, query]);
+
+  function pickPrice(p: PriceOption) {
+    setSelectedId(p.id);
+    setName(p.name);
+    setCategory((p.category as PriceCategory) || "other");
+    setUnit((p.unit as PriceUnit) || "pcs");
+    setUnitPrice(p.price);
+    setHelpKey(p.helpKey ?? undefined);
+    setNote(p.note ?? "");
+    setQuantity(1);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            mode === "price"
+              ? "bg-teal-800 text-white"
+              : "border border-stone-300 bg-white"
+          }`}
+          onClick={() => setMode("price")}
+        >
+          Из прайса
+        </button>
+        <button
+          type="button"
+          className={`rounded-md px-3 py-1.5 text-sm ${
+            mode === "custom"
+              ? "bg-teal-800 text-white"
+              : "border border-stone-300 bg-white"
+          }`}
+          onClick={() => setMode("custom")}
+        >
+          Произвольно
+        </button>
+      </div>
+
+      {mode === "price" ? (
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+          <div>
+            <label className="text-xs text-stone-600">
+              Поиск по прайсу
+              <input
+                autoFocus
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                placeholder="ЛДСП, петля, кромка…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
+            <ul className="mt-2 max-h-48 overflow-auto rounded-md border border-stone-200 bg-white">
+              {matches.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    className={`flex w-full items-start justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50 ${
+                      selectedId === p.id ? "bg-teal-50" : ""
+                    }`}
+                    onClick={() => pickPrice(p)}
+                  >
+                    <span>
+                      <span className="font-medium">{p.name}</span>
+                      <span className="mt-0.5 block text-xs text-stone-500">
+                        {CATEGORY_LABELS[
+                          p.category as keyof typeof CATEGORY_LABELS
+                        ] ?? p.category}{" "}
+                        · {UNIT_LABELS[p.unit as keyof typeof UNIT_LABELS] ?? p.unit}
+                      </span>
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap text-stone-700">
+                      {formatRub(p.price)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {!matches.length && (
+                <li className="px-3 py-4 text-sm text-stone-500">
+                  Ничего не найдено
+                </li>
+              )}
+            </ul>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-xs text-stone-600 sm:col-span-2">
+              Наименование
+              <input
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label className="text-xs text-stone-600">
+              Кол-во
+              <input
+                type="number"
+                step="0.01"
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+              />
+            </label>
+            <label className="text-xs text-stone-600">
+              Цена
+              <input
+                type="number"
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(Number(e.target.value) || 0)}
+              />
+            </label>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="text-xs text-stone-600 sm:col-span-2 lg:col-span-4">
+            Наименование
+            <input
+              autoFocus
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Своя статья"
+            />
+          </label>
+          <label className="text-xs text-stone-600">
+            Категория
+            <select
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as PriceCategory)}
+            >
+              {(
+                Object.entries(CATEGORY_LABELS) as Array<[string, string]>
+              )
+                .filter(([k]) => k !== "margin")
+                .map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="text-xs text-stone-600">
+            Ед.
+            <select
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value as PriceUnit)}
+            >
+              {(Object.keys(UNIT_LABELS) as Array<PriceUnit | "%">)
+                .filter((k): k is PriceUnit => k !== "%")
+                .map((k) => (
+                  <option key={k} value={k}>
+                    {UNIT_LABELS[k]}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="text-xs text-stone-600">
+            Кол-во
+            <input
+              type="number"
+              step="0.01"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+            />
+          </label>
+          <label className="text-xs text-stone-600">
+            Цена
+            <input
+              type="number"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={unitPrice}
+              onChange={(e) => setUnitPrice(Number(e.target.value) || 0)}
+            />
+          </label>
+          <label className="text-xs text-stone-600 sm:col-span-2 lg:col-span-4">
+            Заметка
+            <input
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="rounded-md bg-teal-800 px-4 py-2 text-sm text-white disabled:opacity-40"
+          disabled={!name.trim()}
+          onClick={() =>
+            onAdd({
+              name: name.trim(),
+              category,
+              quantity,
+              unit,
+              unitPrice,
+              helpKey,
+              note,
+            })
+          }
+        >
+          Добавить в смету
+        </button>
+        <button
+          type="button"
+          className="rounded-md border px-4 py-2 text-sm"
+          onClick={onCancel}
+        >
+          Отмена
+        </button>
+      </div>
     </div>
   );
 }
