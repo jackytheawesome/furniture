@@ -1,6 +1,7 @@
 "use client";
 
 import { HelpTip } from "@/components/HelpTip";
+import { NumberField } from "@/components/NumberField";
 import { CATEGORY_LABELS, UNIT_LABELS } from "@/lib/types";
 import { useEffect, useState } from "react";
 
@@ -153,13 +154,10 @@ export default function PricesPage() {
                   {UNIT_LABELS[p.unit as keyof typeof UNIT_LABELS] ?? p.unit}
                 </td>
                 <td className="px-3 py-2">
-                  <input
-                    type="number"
+                  <NumberField
                     className="w-28 rounded border px-2 py-1"
                     value={p.price}
-                    onChange={(e) =>
-                      void patch(p.id, { price: Number(e.target.value) || 0 })
-                    }
+                    onChange={(n) => void patch(p.id, { price: n })}
                   />
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-stone-500">

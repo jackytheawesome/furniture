@@ -1,6 +1,11 @@
 "use client";
 
 import { HelpTip } from "@/components/HelpTip";
+import { NumberField } from "@/components/NumberField";
+import {
+  PriceCombobox,
+  type PricePickOption,
+} from "@/components/PriceCombobox";
 import {
   CATALOG,
   catalogCategories,
@@ -170,6 +175,69 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     });
     await load();
   }
+
+  async function applyBoardMaterial(
+    cartItemId: string | null,
+    line: Line,
+    option: PricePickOption,
+  ) {
+    const kind = /хдф|hdf/i.test(line.name) ? "hdf" : "board";
+
+    if (!cartItemId || !project) {
+      const nextName =
+        line.cartItemId == null
+          ? option.name
+          : line.name.includes(":")
+            ? `${line.name.split(":")[0]}: ${option.name}`
+            : option.name;
+      await patchLine(line.id, {
+        name: nextName,
+        unitPrice: option.price,
+        unit: option.unit,
+        category: "board",
+      });
+      return;
+    }
+
+    const item = project.cartItems.find((c) => c.id === cartItemId);
+    if (!item) return;
+    let current: Record<string, unknown> = {};
+    try {
+      current = JSON.parse(item.params || "{}") as Record<string, unknown>;
+    } catch {
+      current = {};
+    }
+    const params =
+      kind === "hdf"
+        ? { ...current, hdfMaterialKey: option.key }
+        : { ...current, boardMaterialKey: option.key };
+
+    const res = await fetch(`/api/projects/${projectId}/items/${cartItemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ params }),
+    });
+    if (!res.ok) {
+      setMessage("Не удалось обновить материал");
+      return;
+    }
+    setMessage(
+      `Материал обновлён: ${option.name} · ${formatRub(option.price)}`,
+    );
+    await load();
+  }
+
+  const boardPriceOptions = useMemo(
+    () =>
+      prices.filter(
+        (p) =>
+          p.category === "board" &&
+          (p.unit === "m2" ||
+            p.key === "board-ldsp-18" ||
+            p.key === "board-hdf"),
+      ),
+    [prices],
+  );
 
   async function patchLine(lineId: string, patch: Partial<Line>) {
     await fetch(`/api/projects/${projectId}/lines`, {
@@ -462,19 +530,17 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         </label>
         <label className="text-sm">
           Наценка, %
-          <input
-            type="number"
+          <NumberField
             className="mt-1 w-full rounded-md border px-3 py-2"
             value={project.marginPercent}
-            onChange={(e) =>
+            live
+            onChange={(n) =>
               setProject({
                 ...project,
-                marginPercent: Number(e.target.value) || 0,
+                marginPercent: n,
               })
             }
-            onBlur={() =>
-              void saveMeta({ marginPercent: project.marginPercent })
-            }
+            onCommit={(n) => void saveMeta({ marginPercent: n })}
           />
         </label>
         <label className="text-sm md:col-span-1">
@@ -576,20 +642,24 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                           </option>
                         ))}
                       </select>
+                    ) : field.type === "number" ? (
+                      <NumberField
+                        className="mt-1 w-full rounded-md border px-3 py-2"
+                        value={Number(params[field.key] ?? 0)}
+                        live
+                        onChange={(n) =>
+                          setParams({ ...params, [field.key]: n })
+                        }
+                      />
                     ) : (
                       <input
-                        type={field.type === "number" ? "number" : "text"}
-                        step={field.step}
-                        min={field.min}
+                        type="text"
                         className="mt-1 w-full rounded-md border px-3 py-2"
                         value={String(params[field.key] ?? "")}
                         onChange={(e) =>
                           setParams({
                             ...params,
-                            [field.key]:
-                              field.type === "number"
-                                ? Number(e.target.value) || 0
-                                : e.target.value,
+                            [field.key]: e.target.value,
                           })
                         }
                       />
@@ -804,45 +874,77 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                           ] ?? line.category}
                         </td>
                         <td className="px-3 py-2">
-                          <div className="flex items-center">
-                            <input
-                              className="w-full min-w-48 rounded border px-2 py-1"
-                              value={displayName}
-                              onChange={(e) => {
-                                const nextName =
-                                  group.id != null
-                                    ? `${group.title}: ${e.target.value}`
-                                    : e.target.value;
-                                setProject({
-                                  ...project,
-                                  lines: project.lines.map((l) =>
-                                    l.id === line.id
-                                      ? { ...l, name: nextName }
-                                      : l,
-                                  ),
-                                });
-                              }}
-                              onBlur={(e) => {
-                                const nextName =
-                                  group.id != null
-                                    ? `${group.title}: ${e.target.value}`
-                                    : e.target.value;
-                                void patchLine(line.id, { name: nextName });
-                              }}
-                            />
+                          <div className="flex items-center gap-1">
+                            {line.category === "board" ? (
+                              <PriceCombobox
+                                options={boardPriceOptions}
+                                label={displayName}
+                                placeholder="Плита из прайса…"
+                                onSelect={(opt) =>
+                                  void applyBoardMaterial(
+                                    group.id,
+                                    line,
+                                    opt,
+                                  )
+                                }
+                                onLabelChange={(value) => {
+                                  const nextName =
+                                    group.id != null
+                                      ? `${group.title}: ${value}`
+                                      : value;
+                                  setProject({
+                                    ...project,
+                                    lines: project.lines.map((l) =>
+                                      l.id === line.id
+                                        ? { ...l, name: nextName }
+                                        : l,
+                                    ),
+                                  });
+                                }}
+                                onLabelBlur={(value) => {
+                                  const nextName =
+                                    group.id != null
+                                      ? `${group.title}: ${value}`
+                                      : value;
+                                  void patchLine(line.id, { name: nextName });
+                                }}
+                              />
+                            ) : (
+                              <input
+                                className="w-full min-w-48 rounded border px-2 py-1"
+                                value={displayName}
+                                onChange={(e) => {
+                                  const nextName =
+                                    group.id != null
+                                      ? `${group.title}: ${e.target.value}`
+                                      : e.target.value;
+                                  setProject({
+                                    ...project,
+                                    lines: project.lines.map((l) =>
+                                      l.id === line.id
+                                        ? { ...l, name: nextName }
+                                        : l,
+                                    ),
+                                  });
+                                }}
+                                onBlur={(e) => {
+                                  const nextName =
+                                    group.id != null
+                                      ? `${group.title}: ${e.target.value}`
+                                      : e.target.value;
+                                  void patchLine(line.id, { name: nextName });
+                                }}
+                              />
+                            )}
                             <HelpTip helpKey={line.helpKey} />
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
+                          <NumberField
                             className="w-20 rounded border px-2 py-1"
                             value={line.quantity}
-                            onChange={(e) =>
-                              void patchLine(line.id, {
-                                quantity: Number(e.target.value) || 0,
-                              })
+                            onChange={(n) =>
+                              void patchLine(line.id, { quantity: n })
                             }
                           />
                           <span className="ml-1 text-xs text-stone-500">
@@ -852,14 +954,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                           </span>
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            type="number"
+                          <NumberField
                             className="w-24 rounded border px-2 py-1"
                             value={line.unitPrice}
-                            onChange={(e) =>
-                              void patchLine(line.id, {
-                                unitPrice: Number(e.target.value) || 0,
-                              })
+                            onChange={(n) =>
+                              void patchLine(line.id, { unitPrice: n })
                             }
                           />
                         </td>
@@ -1144,21 +1243,20 @@ function AddEstimateLinePanel({
             </label>
             <label className="text-xs text-stone-600">
               Кол-во
-              <input
-                type="number"
-                step="0.01"
+              <NumberField
                 className="mt-1 w-full rounded-md border px-3 py-2"
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+                live
+                onChange={setQuantity}
               />
             </label>
             <label className="text-xs text-stone-600">
               Цена
-              <input
-                type="number"
+              <NumberField
                 className="mt-1 w-full rounded-md border px-3 py-2"
                 value={unitPrice}
-                onChange={(e) => setUnitPrice(Number(e.target.value) || 0)}
+                live
+                onChange={setUnitPrice}
               />
             </label>
           </div>
@@ -1211,21 +1309,20 @@ function AddEstimateLinePanel({
           </label>
           <label className="text-xs text-stone-600">
             Кол-во
-            <input
-              type="number"
-              step="0.01"
+            <NumberField
               className="mt-1 w-full rounded-md border px-3 py-2"
               value={quantity}
-              onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+              live
+              onChange={setQuantity}
             />
           </label>
           <label className="text-xs text-stone-600">
             Цена
-            <input
-              type="number"
+            <NumberField
               className="mt-1 w-full rounded-md border px-3 py-2"
               value={unitPrice}
-              onChange={(e) => setUnitPrice(Number(e.target.value) || 0)}
+              live
+              onChange={setUnitPrice}
             />
           </label>
           <label className="text-xs text-stone-600 sm:col-span-2 lg:col-span-4">

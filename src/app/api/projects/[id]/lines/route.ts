@@ -87,6 +87,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       enabled: typeof p.enabled === "boolean" ? p.enabled : undefined,
       note: typeof p.note === "string" ? p.note : undefined,
       category: typeof p.category === "string" ? p.category : undefined,
+      helpKey: typeof p.helpKey === "string" ? p.helpKey : undefined,
       source: line.source === "auto" ? "manual" : line.source,
     },
   });

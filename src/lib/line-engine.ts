@@ -29,6 +29,20 @@ function priceOf(prices: PriceMap, key: string) {
   return prices[key];
 }
 
+function resolveBoardKey(
+  prices: PriceMap,
+  params: Record<string, unknown>,
+  kind: "board" | "hdf",
+): string {
+  const preferred =
+    kind === "hdf"
+      ? String(params.hdfMaterialKey ?? "board-hdf")
+      : String(params.boardMaterialKey ?? "board-ldsp-18");
+  const fallback = kind === "hdf" ? "board-hdf" : "board-ldsp-18";
+  if (prices[preferred]) return preferred;
+  return prices[fallback] ? fallback : preferred;
+}
+
 function pushPrice(
   lines: DraftLine[],
   prices: PriceMap,
@@ -101,13 +115,16 @@ export function buildLinesForItem(
 
   if (itemType === "wall_panel") {
     const area = w * h;
-    pushPrice(lines, prices, "board-ldsp-18", area * 1.1, prefix + "Панель ЛДСП");
+    const boardKey = resolveBoardKey(prices, params, "board");
+    pushPrice(lines, prices, boardKey, area * 1.1, prefix + (prices[boardKey]?.name ?? "Панель ЛДСП"));
     pushPrice(lines, prices, "edge-2", (w + h) * 2, prefix + "Кромка панели");
     pushPrice(lines, prices, "labor-cut", area, prefix + "Раскрой панели");
     return lines;
   }
 
   // Generic cabinet-like body
+  const boardKey = resolveBoardKey(prices, params, "board");
+  const hdfKey = resolveBoardKey(prices, params, "hdf");
   const boardM2 = (2 * (w * h + w * d + h * d) + shelves * w * d) * 1.12;
   const hdfM2 = w * h * 0.9;
   const facadeM2 = Math.max(doors, 1) > 0 || drawers > 0
@@ -117,13 +134,33 @@ export function buildLinesForItem(
     ? drawers * 0.15
     : Math.max(facadeM2, doors * 0.4 + drawers * 0.12);
 
-  pushPrice(lines, prices, "board-ldsp-18", boardM2, prefix + "ЛДСП корпуса");
-  pushPrice(lines, prices, "board-hdf", hdfM2, prefix + "ХДФ");
+  pushPrice(
+    lines,
+    prices,
+    boardKey,
+    boardM2,
+    prefix + (prices[boardKey]?.name ?? "ЛДСП корпуса"),
+  );
+  pushPrice(
+    lines,
+    prices,
+    hdfKey,
+    hdfM2,
+    prefix + (prices[hdfKey]?.name ?? "ХДФ"),
+  );
   if (facadeArea > 0) {
     pushPrice(lines, prices, facadeKey(facadeType), facadeArea, prefix + "Фасады");
   }
   if (antresol) {
-    pushPrice(lines, prices, "board-ldsp-18", w * d * 2.2, prefix + "Антресоль (плита)");
+    pushPrice(
+      lines,
+      prices,
+      boardKey,
+      w * d * 2.2,
+      prefix +
+        "Антресоль · " +
+        (prices[boardKey]?.name ?? "плита"),
+    );
     pushPrice(lines, prices, facadeKey(facadeType), w * 0.4, prefix + "Антресоль (фасад)");
   }
 
