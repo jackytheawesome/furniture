@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  role         String      @default("USER") // USER | ADMIN
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  projects     Project[]
+  prices       PriceItem[]
+}
+
+model Project {
+  id                 String              @id @default(cuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientName         String
+  objectName         String
+  notes              String              @default("")
+  status             String              @default("ACTIVE") // ACTIVE | ARCHIVED
+  marginPercent      Float               @default(25)
+  /// JSON: future schematic hints
+  visualHints        String              @default("{}")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  cartItems          CartItem[]
+  lines              EstimateLine[]
+  versions           EstimateVersion[]
+  checklistOverrides ChecklistOverride[]
+}
+
+model CartItem {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  itemType    String
+  name        String
+  params      String         @default("{}")
+  sortOrder   Int            @default(0)
+  /// JSON slot for future SVG / schematic rendering
+  visualHints String         @default("{}")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  lines       EstimateLine[]
+}
+
+model EstimateLine {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cartItemId String?
+  cartItem   CartItem? @relation(fields: [cartItemId], references: [id], onDelete: Cascade)
+  category   String
+  name       String
+  quantity   Float     @default(1)
+  unit       String    @default("pcs")
+  unitPrice  Float     @default(0)
+  enabled    Boolean   @default(true)
+  helpKey    String?
+  note       String    @default("")
+  sortOrder  Int       @default(0)
+  source     String    @default("auto")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model PriceItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  category  String
+  name      String
+  unit      String
+  price     Float
+  note      String   @default("")
+  helpKey   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
+model EstimateVersion {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind       String   @default("DRAFT") // DRAFT | CLIENT
+  label      String
+  snapshot   String
+  total      Float    @default(0)
+  confidence String   @default("medium")
+  notes      String   @default("")
+  createdAt  DateTime @default(now())
+}
+
+model ChecklistOverride {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  ruleId    String
+  status    String
+  note      String   @default("")
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, ruleId])
+}

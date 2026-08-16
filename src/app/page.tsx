@@ -1,5 +1,5 @@
-import { EstimateWorkspace } from "@/components/EstimateWorkspace";
+import { redirect } from "next/navigation";
 
-export default function HomePage() {
-  return <EstimateWorkspace />;
+export default function Home() {
+  redirect("/projects");
 }

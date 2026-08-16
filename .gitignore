@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+prisma/dev.db
+prisma/dev.db-journal
+data/_mp_xlsx
+data/pricing_package/parsed_prices.json

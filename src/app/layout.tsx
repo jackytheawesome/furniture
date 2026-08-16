@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Literata, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
-import { AppProvider } from "@/context/AppState";
-import { Nav } from "@/components/Nav";
+import { Providers } from "@/components/Providers";
+import { AppNav } from "@/components/AppNav";
 
 const display = Literata({
   variable: "--font-display",
@@ -15,9 +15,8 @@ const sans = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "КорпусСмета — расчёт корпусной мебели",
-  description:
-    "Быстрая прикидка и подробная смета встраиваемой корпусной мебели с экспортом в Excel",
+  title: "КорпусСмета",
+  description: "Сметы встраиваемой корпусной мебели",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,13 +25,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="ru"
       className={`${display.variable} ${sans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--foreground)]">
-        <AppProvider>
-          <Nav />
+      <body className="flex min-h-full flex-col bg-[var(--background)] text-[var(--foreground)]">
+        <Providers>
+          <AppNav />
           <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
             {children}
           </main>
-        </AppProvider>
+        </Providers>
       </body>
     </html>
   );

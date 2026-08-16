@@ -1,0 +1,60 @@
+{
+  "package": "Mebel-LAB pricing and rules export",
+  "version": "2026-08-16",
+  "language": "ru",
+  "purpose": "Input corpus for an AI-assisted preliminary furniture costing system",
+  "priority_order": [
+    "current_factory_official_source",
+    "linked_factory_nomenclature",
+    "dated_factory_manager_confirmation",
+    "team_practical_guidance",
+    "internal_conservative_assumption",
+    "historical_method"
+  ],
+  "collections": [
+    {
+      "path": "01_core",
+      "category": "mixed_core",
+      "contains": "normalized price workbook, calculation rules, factory register and change history",
+      "warning": "pricing_rules.md contains universal, factory-specific and project-specific rules; use RULE_CLASSIFICATION.md"
+    },
+    {
+      "path": "02_renaissance_official_prices",
+      "category": "FACTORY_OFFICIAL",
+      "authority": "Renaissance",
+      "scope": "factory_specific"
+    },
+    {
+      "path": "03_renaissance_technical_conditions",
+      "category": "FACTORY_OFFICIAL",
+      "authority": "Renaissance",
+      "scope": "factory_specific"
+    },
+    {
+      "path": "04_dream_official",
+      "category": "FACTORY_OFFICIAL_AND_ANALYTICAL_README",
+      "authority": "Dream Mebel / Mebel-LAB",
+      "scope": "factory_specific",
+      "warning": "README files are analytical notes; PDF/XLSX files are the received factory sources"
+    },
+    {
+      "path": "05_source_correspondence",
+      "category": "MIXED_CORRESPONDENCE",
+      "scope": "source_specific",
+      "warning": "Determine authority from 00_INDEX.md and each file header"
+    },
+    {
+      "path": "06_internal_rules",
+      "category": "CLASSIFICATION",
+      "authority": "Mebel-LAB",
+      "scope": "meta",
+      "warning": "Classification is not a price source"
+    }
+  ],
+  "excluded": [
+    "client estimates and proposals",
+    "Renaissance website knowledge-base crawl",
+    "processed OCR, previews and caches",
+    "old factory estimate examples"
+  ]
+}

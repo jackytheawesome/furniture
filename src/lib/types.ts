@@ -9,66 +9,11 @@ export type PriceCategory =
   | "labor"
   | "other";
 
-export type FacadeType = "film" | "enamel" | "veneer" | "frame";
+export type LineCategory = PriceCategory | "margin";
 
-export type EstimateMode = "quick" | "detailed";
+export type FacadeType = "film" | "enamel" | "veneer" | "frame" | "ldsp";
 
-export interface PriceItem {
-  id: string;
-  category: PriceCategory;
-  name: string;
-  unit: PriceUnit;
-  price: number;
-  note?: string;
-  helpKey?: string;
-}
-
-export interface EstimateLine {
-  id: string;
-  category: PriceCategory | "margin";
-  name: string;
-  quantity: number;
-  unit: PriceUnit | "%";
-  unitPrice: number;
-  enabled: boolean;
-  note?: string;
-  helpKey?: string;
-  manualPrice?: boolean;
-}
-
-export interface QuickEstimateInput {
-  lowerLm: number;
-  upperLm: number;
-  cabinetDepthM: number;
-  facadeType: FacadeType;
-  drawerCount: number;
-  doorCount: number;
-  tallUnitCount: number;
-  applianceCount: number;
-  hasCountertop: boolean;
-  countertopLm: number;
-  hasBacksplash: boolean;
-  backsplashLm: number;
-  lighting: boolean;
-  delivery: boolean;
-  installation: boolean;
-}
-
-export interface Project {
-  id: string;
-  clientName: string;
-  objectName: string;
-  mode: EstimateMode;
-  marginPercent: number;
-  lines: EstimateLine[];
-  quickInput: QuickEstimateInput;
-  updatedAt: string;
-}
-
-export interface AppData {
-  prices: PriceItem[];
-  project: Project;
-}
+export type Confidence = "low" | "medium" | "high";
 
 export const UNIT_LABELS: Record<PriceUnit | "%", string> = {
   m2: "м²",
@@ -79,7 +24,7 @@ export const UNIT_LABELS: Record<PriceUnit | "%", string> = {
   "%": "%",
 };
 
-export const CATEGORY_LABELS: Record<PriceCategory | "margin", string> = {
+export const CATEGORY_LABELS: Record<LineCategory, string> = {
   board: "Корпуса / плита",
   facade: "Фасады",
   edge: "Кромка",
@@ -92,7 +37,14 @@ export const CATEGORY_LABELS: Record<PriceCategory | "margin", string> = {
 
 export const FACADE_LABELS: Record<FacadeType, string> = {
   film: "Плёнка ПВХ",
-  enamel: "Эмаль / краска",
+  enamel: "Эмаль",
   veneer: "Шпон",
-  frame: "Рамочный / МДФ профиль",
+  frame: "Рамочный",
+  ldsp: "ЛДСП",
+};
+
+export const CONFIDENCE_LABELS: Record<Confidence, string> = {
+  low: "Низкая точность (± широкий порядок)",
+  medium: "Средняя точность (ориентир для клиента)",
+  high: "Высокая точность (после уточнений/замеров)",
 };
