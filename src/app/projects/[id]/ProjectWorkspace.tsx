@@ -77,6 +77,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   );
   const [message, setMessage] = useState<string | null>(null);
   const [importPreview, setImportPreview] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const typesInCategory = useMemo(
     () => CATALOG.filter((c) => c.category === category),
@@ -135,6 +136,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       return;
     }
     setMessage("Предмет добавлен в корзину");
+    setShowAddForm(false);
     await load();
   }
 
@@ -435,178 +437,205 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         </label>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-stone-300 bg-[#faf7f1] p-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl">
-            Добавить в корзину
-          </h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              Категория
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {catalogCategories().map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm">
-              Предмет
-              <select
-                className="mt-1 w-full rounded-md border px-3 py-2"
-                value={itemType}
-                onChange={(e) => setItemType(e.target.value)}
-              >
-                {typesInCategory.map((t) => (
-                  <option key={t.type} value={t.type}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <p className="mt-2 text-xs text-stone-600">{def?.description}</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {def?.fields.map((field) => (
-              <label key={field.key} className="text-sm">
-                {field.label}
-                {field.type === "boolean" ? (
-                  <input
-                    type="checkbox"
-                    className="ml-2"
-                    checked={Boolean(params[field.key])}
-                    onChange={(e) =>
-                      setParams({ ...params, [field.key]: e.target.checked })
-                    }
-                  />
-                ) : field.type === "select" ? (
+      <section className="space-y-4">
+        {!showAddForm ? (
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="rounded-md bg-teal-800 px-4 py-2 text-white"
+          >
+            Добавить предмет мебели
+          </button>
+        ) : null}
+
+        <div
+          className={
+            showAddForm ? "grid gap-6 lg:grid-cols-2" : "grid gap-6"
+          }
+        >
+          {showAddForm ? (
+            <div className="rounded-xl border border-stone-300 bg-[#faf7f1] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="font-[family-name:var(--font-display)] text-xl">
+                  Добавить в корзину
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="text-sm text-stone-600 underline-offset-2 hover:underline"
+                >
+                  Отмена
+                </button>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-sm">
+                  Категория
                   <select
                     className="mt-1 w-full rounded-md border px-3 py-2"
-                    value={String(params[field.key] ?? "")}
-                    onChange={(e) =>
-                      setParams({ ...params, [field.key]: e.target.value })
-                    }
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
                   >
-                    {field.options?.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
+                    {catalogCategories().map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
                       </option>
                     ))}
                   </select>
-                ) : (
-                  <input
-                    type={field.type === "number" ? "number" : "text"}
-                    step={field.step}
-                    min={field.min}
+                </label>
+                <label className="text-sm">
+                  Предмет
+                  <select
                     className="mt-1 w-full rounded-md border px-3 py-2"
-                    value={String(params[field.key] ?? "")}
-                    onChange={(e) =>
-                      setParams({
-                        ...params,
-                        [field.key]:
-                          field.type === "number"
-                            ? Number(e.target.value) || 0
-                            : e.target.value,
-                      })
-                    }
-                  />
-                )}
-              </label>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => void addToCart()}
-            className="mt-4 rounded-md bg-teal-800 px-4 py-2 text-white"
-          >
-            В корзину
-          </button>
-        </div>
-
-        <div className="rounded-xl border border-stone-300 bg-white p-4">
-          <h2 className="font-[family-name:var(--font-display)] text-xl">
-            Корзина предметов
-          </h2>
-          <ul className="mt-3 space-y-2">
-            {project.cartItems.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between rounded-md border border-stone-200 px-3 py-2 text-sm"
+                    value={itemType}
+                    onChange={(e) => setItemType(e.target.value)}
+                  >
+                    {typesInCategory.map((t) => (
+                      <option key={t.type} value={t.type}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-stone-600">{def?.description}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {def?.fields.map((field) => (
+                  <label key={field.key} className="text-sm">
+                    {field.label}
+                    {field.type === "boolean" ? (
+                      <input
+                        type="checkbox"
+                        className="ml-2"
+                        checked={Boolean(params[field.key])}
+                        onChange={(e) =>
+                          setParams({ ...params, [field.key]: e.target.checked })
+                        }
+                      />
+                    ) : field.type === "select" ? (
+                      <select
+                        className="mt-1 w-full rounded-md border px-3 py-2"
+                        value={String(params[field.key] ?? "")}
+                        onChange={(e) =>
+                          setParams({ ...params, [field.key]: e.target.value })
+                        }
+                      >
+                        {field.options?.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={field.type === "number" ? "number" : "text"}
+                        step={field.step}
+                        min={field.min}
+                        className="mt-1 w-full rounded-md border px-3 py-2"
+                        value={String(params[field.key] ?? "")}
+                        onChange={(e) =>
+                          setParams({
+                            ...params,
+                            [field.key]:
+                              field.type === "number"
+                                ? Number(e.target.value) || 0
+                                : e.target.value,
+                          })
+                        }
+                      />
+                    )}
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => void addToCart()}
+                className="mt-4 rounded-md bg-teal-800 px-4 py-2 text-white"
               >
-                <span>
-                  <b>{item.name}</b>
-                  <span className="text-stone-500"> · {item.itemType}</span>
-                </span>
-                <button
-                  type="button"
-                  className="text-red-700"
-                  onClick={() => void removeItem(item.id)}
-                >
-                  Удалить
-                </button>
-              </li>
-            ))}
-            {!project.cartItems.length && (
-              <li className="text-sm text-stone-500">Пока пусто</li>
-            )}
-          </ul>
+                В корзину
+              </button>
+            </div>
+          ) : null}
 
-          <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
-            <p className="font-medium">Импорт</p>
-            <label className="block">
-              CSV / Excel / PRO100
-              <input
-                type="file"
-                accept=".csv,.txt,.xlsx,.xls"
-                className="mt-1 block w-full"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void onImportFile(f, "csv", false);
-                }}
-              />
-            </label>
-            <label className="block">
-              PDF дизайнера
-              <input
-                type="file"
-                accept=".pdf"
-                className="mt-1 block w-full"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void onImportFile(f, "pdf", false);
-                }}
-              />
-            </label>
-            {importPreview && (
-              <>
-                <pre className="max-h-40 overflow-auto rounded bg-stone-100 p-2 text-xs">
-                  {importPreview}
-                </pre>
-                <button
-                  type="button"
-                  className="rounded-md bg-stone-900 px-3 py-2 text-white"
-                  onClick={() => {
-                    const f = (window as unknown as { __importFile?: File })
-                      .__importFile;
-                    if (!f) {
-                      setMessage("Снова выберите файл для применения");
-                      return;
-                    }
-                    const kind = f.name.toLowerCase().endsWith(".pdf")
-                      ? "pdf"
-                      : "csv";
-                    void onImportFile(f, kind, true);
-                  }}
+          <div className="rounded-xl border border-stone-300 bg-white p-4">
+            <h2 className="font-[family-name:var(--font-display)] text-xl">
+              Корзина предметов
+            </h2>
+            <ul className="mt-3 space-y-2">
+              {project.cartItems.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between rounded-md border border-stone-200 px-3 py-2 text-sm"
                 >
-                  Применить импорт
-                </button>
-              </>
-            )}
+                  <span>
+                    <b>{item.name}</b>
+                    <span className="text-stone-500"> · {item.itemType}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="text-red-700"
+                    onClick={() => void removeItem(item.id)}
+                  >
+                    Удалить
+                  </button>
+                </li>
+              ))}
+              {!project.cartItems.length && (
+                <li className="text-sm text-stone-500">Пока пусто</li>
+              )}
+            </ul>
+
+            <div className="mt-4 space-y-2 border-t border-stone-200 pt-4 text-sm">
+              <p className="font-medium">Импорт</p>
+              <label className="block">
+                CSV / Excel / PRO100
+                <input
+                  type="file"
+                  accept=".csv,.txt,.xlsx,.xls"
+                  className="mt-1 block w-full"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onImportFile(f, "csv", false);
+                  }}
+                />
+              </label>
+              <label className="block">
+                PDF дизайнера
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="mt-1 block w-full"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void onImportFile(f, "pdf", false);
+                  }}
+                />
+              </label>
+              {importPreview && (
+                <>
+                  <pre className="max-h-40 overflow-auto rounded bg-stone-100 p-2 text-xs">
+                    {importPreview}
+                  </pre>
+                  <button
+                    type="button"
+                    className="rounded-md bg-stone-900 px-3 py-2 text-white"
+                    onClick={() => {
+                      const f = (window as unknown as { __importFile?: File })
+                        .__importFile;
+                      if (!f) {
+                        setMessage("Снова выберите файл для применения");
+                        return;
+                      }
+                      const kind = f.name.toLowerCase().endsWith(".pdf")
+                        ? "pdf"
+                        : "csv";
+                      void onImportFile(f, kind, true);
+                    }}
+                  >
+                    Применить импорт
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </section>
