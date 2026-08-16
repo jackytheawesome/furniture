@@ -52,6 +52,21 @@ export default function ProjectsPage() {
     }
   }
 
+  async function deleteProject(p: ProjectRow) {
+    const label = p.objectName || p.clientName || "проект";
+    const ok = window.confirm(
+      `Удалить проект «${label}»?\n\nСмета, корзина и версии будут удалены безвозвратно.`,
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/projects/${p.id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setMessage("Не удалось удалить проект");
+      return;
+    }
+    setMessage(null);
+    await load();
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,12 +128,21 @@ export default function ProjectsPage() {
                     {new Date(p.updatedAt).toLocaleString("ru-RU")}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/projects/${p.id}`}
-                      className="text-teal-800 underline"
-                    >
-                      Открыть
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link
+                        href={`/projects/${p.id}`}
+                        className="text-teal-800 underline"
+                      >
+                        Открыть
+                      </Link>
+                      <button
+                        type="button"
+                        className="text-red-700 underline-offset-2 hover:underline"
+                        onClick={() => void deleteProject(p)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

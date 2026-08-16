@@ -76,9 +76,6 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  await prisma.project.update({
-    where: { id },
-    data: { status: "ARCHIVED" },
-  });
+  await prisma.project.delete({ where: { id } });
   return NextResponse.json({ ok: true });
 }

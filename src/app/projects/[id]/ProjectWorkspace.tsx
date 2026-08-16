@@ -22,6 +22,7 @@ import {
   type PriceUnit,
 } from "@/lib/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 interface PriceOption {
@@ -85,6 +86,7 @@ interface ChecklistRow {
 }
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [project, setProject] = useState<Project | null>(null);
   const [checklist, setChecklist] = useState<ChecklistRow[]>([]);
   const [confidence, setConfidence] = useState<Confidence>("medium");
@@ -379,6 +381,21 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     await load();
   }
 
+  async function deleteProject() {
+    if (!project) return;
+    const label = project.objectName || project.clientName || "проект";
+    const ok = window.confirm(
+      `Удалить проект «${label}»?\n\nСмета, корзина и версии будут удалены безвозвратно.`,
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+    if (!res.ok) {
+      setMessage("Не удалось удалить проект");
+      return;
+    }
+    router.push("/projects");
+  }
+
   async function download(path: string, filenameHint: string) {
     const res = await fetch(path, { method: "POST" });
     if (!res.ok) {
@@ -576,6 +593,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
             onClick={() => void saveVersion("CLIENT")}
           >
             Версия клиенту
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-red-300 bg-white px-3 py-2 text-sm text-red-800"
+            onClick={() => void deleteProject()}
+          >
+            Удалить проект
           </button>
         </div>
       </div>

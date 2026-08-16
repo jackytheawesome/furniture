@@ -9,11 +9,11 @@ export async function GET() {
   }
   const where =
     session.user.role === "ADMIN"
-      ? {}
-      : { userId: session.user.id, status: "ACTIVE" };
+      ? { status: "ACTIVE" as const }
+      : { userId: session.user.id, status: "ACTIVE" as const };
 
   const projects = await prisma.project.findMany({
-    where: session.user.role === "ADMIN" ? where : { userId: session.user.id },
+    where,
     orderBy: { updatedAt: "desc" },
     include: {
       user: { select: { name: true, email: true } },
