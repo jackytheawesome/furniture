@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: furniture
+      POSTGRES_PASSWORD: furniture
+      POSTGRES_DB: furniture
+    volumes:
+      - furniture_pg:/var/lib/postgresql/data
+
+volumes:
+  furniture_pg:

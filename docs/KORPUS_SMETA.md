@@ -13,7 +13,7 @@
 - полный раскрой / nesting (это у технологов);
 - нативный разбор PRO100 `.sto` — только CSV/TXT «Список деталей»;
 - SVG-схемы в UI (в модели есть `visualHints` под будущее);
-- production Postgres / стабильный Vercel-деплой (локально SQLite; Vercel ранее упирался в auth API).
+- production Postgres на Timeweb VPS (Docker); локально — `docker compose` + Postgres.
 
 **Бренд / имя:** КорпусСмета.
 
@@ -25,7 +25,7 @@
 |------|--------|
 | UI | Next.js **16.3** App Router, React 19, Tailwind 4 |
 | Auth | Auth.js v5 (credentials), `src/lib/auth.ts`, `src/middleware.ts` |
-| DB | Prisma **5** + **SQLite** (`file:./dev.db`, `DATABASE_URL` в `.env`) |
+| DB | Prisma **5** + **PostgreSQL** (`DATABASE_URL` в `.env`; деплой — `docs/DEPLOY.md`) |
 | Excel | ExcelJS |
 | PDF import | `pdf-parse` v2 (`PDFParse`) |
 | PDF export | `@react-pdf/renderer` |

@@ -8,7 +8,9 @@
 
 ```bash
 npm install
-npx prisma migrate dev
+docker compose up -d
+cp .env.example .env
+npx prisma migrate deploy
 npx prisma db seed
 npm run dev
 ```
@@ -47,4 +49,6 @@ npm run prices:import-renaissance
 
 ## Стек
 
-Next.js 16, Auth.js, Prisma 5 (SQLite локально), ExcelJS, pdf-parse, @react-pdf/renderer.
+Next.js 16, Auth.js, Prisma 5 (**PostgreSQL**), ExcelJS, pdf-parse, @react-pdf/renderer.
+
+**Деплой на Timeweb VPS:** [docs/DEPLOY.md](docs/DEPLOY.md)
